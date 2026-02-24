@@ -1,7 +1,7 @@
 (() => {
   const ROOT_ID = "sl-quiz-bot";
 
-  // ✅ σημαντικό: relative paths για GitHub Pages (δουλεύει και σε /REPO/)
+  // ✅ relative path για GitHub Pages (δουλεύει και σε /REPO/)
   const QUESTIONS_URL = "./quiz/questions_124_with_answers.json";
 
   // Supabase settings (από το index.html)
@@ -38,7 +38,7 @@
     <div class="qb-card" role="region" aria-label="Quiz Bot">
       <p class="qb-title">Quiz Bot</p>
 
-      <!-- ✅ Βήμα 1: Login (Όνομα/Επώνυμο) -->
+      <!-- ✅ Βήμα 1: Login -->
       <div id="qb-login" style="margin-bottom:12px;">
         <div style="font-weight:700; margin-bottom:6px;">Στοιχεία χρήστη</div>
         <div class="qb-row">
@@ -47,6 +47,15 @@
           <button class="qb-btn secondary" id="qb-start">Έναρξη</button>
         </div>
         <div id="qb-login-status" style="font-size:12px; color:#555; margin-top:6px;"></div>
+      </div>
+
+      <!-- ✅ Βήμα 2: Κατηγορίες (εμφανίζεται μετά το login) -->
+      <div id="qb-cats" style="margin: 10px 0 12px; display:none;">
+        <div style="font-weight:700; margin-bottom:6px;">Κατηγορίες</div>
+        <div id="qb-cats-list" class="qb-choices" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));"></div>
+        <div style="font-size:12px; color:#555; margin-top:6px;">
+          Αν δεν επιλέξεις τίποτα, θα παίζει από όλες.
+        </div>
       </div>
 
       <p class="qb-q" id="qb-question">Φόρτωση…</p>
@@ -122,6 +131,10 @@
   const startBtn = $("#qb-start");
   const loginStatus = $("#qb-login-status");
 
+  // --- categories controls ---
+  const catsBox = $("#qb-cats");
+  const catsList = $("#qb-cats-list");
+
   // --- session id ---
   const sessionId = (() => {
     const k = "sl_quiz_session_id_v1";
@@ -161,6 +174,7 @@
       last_name: lastName
     }]);
 
+    // ignore duplicates
     if (error && !String(error.message || "").toLowerCase().includes("duplicate")) {
       console.warn("quiz_sessions insert error:", error);
     }
@@ -180,19 +194,68 @@
   let current = null;
   let locked = false;
 
-  function pickRandomQuestion() {
-    return questions[Math.floor(Math.random() * questions.length)];
-  }
+  // --- categories state ---
+  const CAT_KEY = "sl_quiz_categories_v1";
+  let selectedCats = new Set();
+  try {
+    const saved = JSON.parse(localStorage.getItem(CAT_KEY) || "[]");
+    selectedCats = new Set(Array.isArray(saved) ? saved : []);
+  } catch {}
 
-  function lockChoices() {
-    locked = true;
-    elArea.querySelectorAll(".qb-choice").forEach(b => b.setAttribute("aria-disabled", "true"));
+  function saveCats() {
+    localStorage.setItem(CAT_KEY, JSON.stringify([...selectedCats]));
   }
 
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
     }[c]));
+  }
+
+  function normCat(q) {
+    return ((q.category || "Γενικά") + "").trim() || "Γενικά";
+  }
+
+  function getCategoriesFromQuestions(qs) {
+    const set = new Set();
+    qs.forEach(q => set.add(normCat(q)));
+    return [...set].sort((a, b) => a.localeCompare(b, "el"));
+  }
+
+  function renderCategoriesUI(categories) {
+    catsList.innerHTML = categories.map(cat => {
+      const checked = selectedCats.has(cat) ? "checked" : "";
+      return `
+        <label class="qb-choice" style="display:flex; gap:10px; align-items:center;">
+          <input type="checkbox" data-cat="${escapeHtml(cat)}" ${checked} />
+          <span>${escapeHtml(cat)}</span>
+        </label>
+      `;
+    }).join("");
+
+    catsList.querySelectorAll("input[type=checkbox]").forEach(cb => {
+      cb.addEventListener("change", () => {
+        const cat = cb.getAttribute("data-cat");
+        if (!cat) return;
+        if (cb.checked) selectedCats.add(cat);
+        else selectedCats.delete(cat);
+        saveCats();
+      });
+    });
+  }
+
+  function pickRandomQuestion() {
+    const pool = (selectedCats.size === 0)
+      ? questions
+      : questions.filter(q => selectedCats.has(normCat(q)));
+
+    if (!pool.length) return questions[Math.floor(Math.random() * questions.length)];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  function lockChoices() {
+    locked = true;
+    elArea.querySelectorAll(".qb-choice").forEach(b => b.setAttribute("aria-disabled", "true"));
   }
 
   function feedback(ok, msg, explanation) {
@@ -224,20 +287,7 @@
       elArea.querySelectorAll(".qb-choice").forEach(btn => {
         btn.addEventListener("click", () => {
           if (locked) return;
-          const userVal = btn.dataset.val === "true";
-          gradeTF(userVal);
-        });
-      });
-    } else if (q.type === "mcq") {
-      elArea.innerHTML = `
-        <div class="qb-choices">
-          ${q.choices.map((c, i) => `<button class="qb-choice" data-idx="${i}">${escapeHtml(c)}</button>`).join("")}
-        </div>
-      `;
-      elArea.querySelectorAll(".qb-choice").forEach(btn => {
-        btn.addEventListener("click", () => {
-          if (locked) return;
-          gradeMCQ(Number(btn.dataset.idx));
+          gradeTF(btn.dataset.val === "true");
         });
       });
     } else {
@@ -268,31 +318,6 @@
     feedback(ok, `Η σωστή απάντηση είναι: ${current.answer ? "Σωστό" : "Λάθος"}.`, current.explanation || "");
   }
 
-  function gradeMCQ(userIdx) {
-    lockChoices();
-    state.total += 1;
-
-    const ok = userIdx === current.answerIndex;
-    if (ok) state.correct += 1;
-
-    elLast.textContent = `Τελευταία: ${ok ? "Σωστό" : "Λάθος"}`;
-    setScore();
-
-    const rt = Math.round(performance.now() - current._startTs);
-    logAttempt({
-      session_id: sessionId,
-      question_id: current.id,
-      q_type: current.type,
-      is_correct: ok,
-      response_time_ms: rt,
-      user_answer: String(userIdx)
-    });
-
-    const correctText = current.choices[current.answerIndex];
-    const chosenText = current.choices[userIdx];
-    feedback(ok, `Επέλεξες: "${chosenText}". Σωστό: "${correctText}".`, current.explanation || "");
-  }
-
   // feedback submit
   fbSend.addEventListener("click", async () => {
     if (!current) return;
@@ -314,7 +339,10 @@
 
   btnNext.addEventListener("click", () => renderQuestion(pickRandomQuestion()));
   btnReset.addEventListener("click", () => {
-    state.correct = 0; state.total = 0; saveState(); setScore();
+    state.correct = 0;
+    state.total = 0;
+    saveState();
+    setScore();
     elLast.textContent = "Τελευταία: —";
     if (questions.length) renderQuestion(pickRandomQuestion());
   });
@@ -336,12 +364,37 @@
   // αρχικά κλείδωσε μέχρι να γίνει login
   setQuizEnabled(false);
 
-  // αν υπάρχει ήδη user, auto-start
-  if (user?.first_name && user?.last_name) {
-    loginBox.style.display = "none";
-    setQuizEnabled(true);
-    registerSessionIfNeeded(user.first_name, user.last_name);
-  }
+  // init
+  (async () => {
+    try {
+      const res = await fetch(QUESTIONS_URL, { cache: "no-store" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (!Array.isArray(data) || !data.length) throw new Error("Empty questions");
+      questions = data;
+
+      // categories from data
+      const categories = getCategoriesFromQuestions(questions);
+      renderCategoriesUI(categories);
+
+      setScore();
+
+      // αν υπάρχει ήδη user, auto-start
+      if (user?.first_name && user?.last_name) {
+        loginBox.style.display = "none";
+        setQuizEnabled(true);
+        catsBox.style.display = "";
+        registerSessionIfNeeded(user.first_name, user.last_name);
+        renderQuestion(pickRandomQuestion());
+      } else {
+        elQuestion.textContent = "Συμπλήρωσε στοιχεία για να ξεκινήσεις.";
+      }
+    } catch (e) {
+      console.error(e);
+      elQuestion.textContent = "Αποτυχία φόρτωσης ερωτήσεων.";
+      elArea.innerHTML = `<p style="color:#b00">Έλεγξε το ${escapeHtml(QUESTIONS_URL)} και το format του JSON.</p>`;
+    }
+  })();
 
   startBtn.addEventListener("click", async () => {
     const firstName = (firstIn.value || "").trim();
@@ -360,30 +413,8 @@
 
     loginBox.style.display = "none";
     setQuizEnabled(true);
+    catsBox.style.display = "";
 
     if (questions.length) renderQuestion(pickRandomQuestion());
   });
-
-  // init
-  (async () => {
-    try {
-      const res = await fetch(QUESTIONS_URL, { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (!Array.isArray(data) || !data.length) throw new Error("Empty questions");
-      questions = data;
-      setScore();
-
-      // Μόνο αν έχει γίνει login, δείχνουμε ερώτηση (αλλιώς περιμένουμε)
-      if (loginBox.style.display === "none") {
-        renderQuestion(pickRandomQuestion());
-      } else {
-        elQuestion.textContent = "Συμπλήρωσε στοιχεία για να ξεκινήσεις.";
-      }
-    } catch (e) {
-      console.error(e);
-      elQuestion.textContent = "Αποτυχία φόρτωσης ερωτήσεων.";
-      elArea.innerHTML = `<p style="color:#b00">Έλεγξε το ${escapeHtml(QUESTIONS_URL)} και το format του JSON.</p>`;
-    }
-  })();
 })();
