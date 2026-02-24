@@ -2,7 +2,7 @@
   const ROOT_ID = "sl-quiz-bot";
 
   // ✅ σημαντικό: relative paths για GitHub Pages (δουλεύει και σε /REPO/)
-  const QUESTIONS_URL = "./quiz/questions.json";
+  const QUESTIONS_URL = "./quiz/questions_124_with_answers.json";
 
   // Supabase settings (από το index.html)
   const SUPABASE_URL = window.SUPABASE_URL;
