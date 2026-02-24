@@ -2,58 +2,20 @@
 <html lang="el">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Supabase Insert Test</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Quiz Bot</title>
 </head>
 <body>
-  <h1>Supabase Insert Test</h1>
-  <button id="btn">Insert test row</button>
-  <pre id="out">—</pre>
+  <h1>Quiz Bot</h1>
+
+  <div id="sl-quiz-bot"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    const SUPABASE_URL = "https://owinemnpnsonxdwmueqt.supabase.co";
-
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93aW5lbW5wbnNvbnhkd211ZXF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MzczNDYsImV4cCI6MjA4NzUxMzM0Nn0.848fRcCZJNd7Vf30koV9B1-_LTMVfw9SasFr2hdbFEw";
-
-    const out = document.getElementById("out");
-    const btn = document.getElementById("btn");
-
-    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    function sessionId() {
-      const k = "sl_quiz_session_id_v1";
-      let v = localStorage.getItem(k);
-      if (!v) {
-        v = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + "_" + Math.random());
-        localStorage.setItem(k, v);
-      }
-      return v;
-    }
-
-    btn.addEventListener("click", async () => {
-      out.textContent = "Inserting…";
-
-      const payload = {
-        session_id: sessionId(),
-        question_id: "test_question_001",
-        q_type: "tf",
-        is_correct: true,
-        response_time_ms: 1234,
-        user_answer: "true"
-      };
-
-      const { data, error } = await sb.from("quiz_attempts").insert([payload]).select();
-
-      if (error) {
-        out.textContent = "ERROR:\n" + JSON.stringify(error, null, 2);
-      } else {
-        out.textContent = "OK:\n" + JSON.stringify(data, null, 2);
-      }
-    });
-    <script>
-      console.log("SUPABASE_URL =", SUPABASE_URL);
-    </script>
+    window.SUPABASE_URL = "https://owinemnpnsonxdwmueqt.supabase.co";
+    window.SUPABASE_KEY = "sb_publishable_kDi9KP1OeNzW7SuPwSuBEQ_YwlFBpXA";
   </script>
+
+  <script src="./quiz/quiz-bot.js"></script>
 </body>
 </html>
