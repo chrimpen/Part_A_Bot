@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Supabase Insert Test</title>
+</head>
+<body>
+  <h1>Supabase Insert Test</h1>
+  <button id="btn">Insert test row</button>
+  <pre id="out">—</pre>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // 1) Βάλε εδώ το Project URL (https://<project-ref>.supabase.co)
+    const SUPABASE_URL = "https://<PROJECT_REF>.supabase.co";
+
+    // 2) Βάλε εδώ το Publishable key (sb_publishable_...)
+    const SUPABASE_KEY = "sb_publishable_...";
+
+    const out = document.getElementById("out");
+    const btn = document.getElementById("btn");
+
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    function sessionId() {
+      const k = "sl_quiz_session_id_v1";
+      let v = localStorage.getItem(k);
+      if (!v) {
+        v = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + "_" + Math.random());
+        localStorage.setItem(k, v);
+      }
+      return v;
+    }
+
+    btn.addEventListener("click", async () => {
+      out.textContent = "Inserting…";
+
+      const payload = {
+        session_id: sessionId(),
+        question_id: "test_question_001",
+        q_type: "tf",
+        is_correct: true,
+        response_time_ms: 1234,
+        user_answer: "true"
+      };
+
+      const { data, error } = await sb.from("quiz_attempts").insert([payload]).select();
+
+      if (error) {
+        out.textContent = "ERROR:\n" + JSON.stringify(error, null, 2);
+      } else {
+        out.textContent = "OK:\n" + JSON.stringify(data, null, 2);
+      }
+    });
+  </script>
+</body>
+</html>
