@@ -12,11 +12,9 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    // 1) Βάλε εδώ το Project URL (https://<project-ref>.supabase.co)
-    const SUPABASE_URL = "https://<PROJECT_REF>.supabase.co";
+    const SUPABASE_URL = "https://owinemnpnsonxdwmueqt.supabase.co";
 
-    // 2) Βάλε εδώ το Publishable key (sb_publishable_...)
-    const SUPABASE_KEY = "sb_publishable_...";
+    const SUPABASE_KEY = "sb_publishable_kDi9KP1OeNzW7SuPwSuBEQ_YwlFBpXA";
 
     const out = document.getElementById("out");
     const btn = document.getElementById("btn");
