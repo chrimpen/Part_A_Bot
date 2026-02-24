@@ -1,0 +1,22 @@
+[
+  {
+    "id": "tf_001",
+    "type": "tf",
+    "question": "Η SVM είναι αλγόριθμος επιβλεπόμενης μάθησης.",
+    "answer": true,
+    "explanation": "Οι SVM χρησιμοποιούνται για classification/regression με labels."
+  },
+  {
+    "id": "mcq_001",
+    "type": "mcq",
+    "question": "Ποιο είναι το βασικό trade-off του k-NN;",
+    "choices": [
+      "Χρειάζεται εκπαίδευση με gradient descent",
+      "Έχει υψηλό κόστος στο inference",
+      "Δεν μπορεί να κάνει multi-class",
+      "Απαιτεί γραμμικά separable δεδομένα"
+    ],
+    "answerIndex": 1,
+    "explanation": "Το k-NN είναι lazy learner: η πρόβλεψη απαιτεί αναζήτηση στα δείγματα."
+  }
+]
