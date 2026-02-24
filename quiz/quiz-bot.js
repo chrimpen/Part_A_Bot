@@ -32,10 +32,23 @@
       .qb-badge { border: 1px solid #ddd; border-radius: 999px; padding: 4px 8px; background: #fafafa; }
       textarea.qb-choice { cursor:auto; }
       select.qb-choice { cursor:auto; }
+      input.qb-choice { cursor:auto; }
     </style>
 
     <div class="qb-card" role="region" aria-label="Quiz Bot">
       <p class="qb-title">Quiz Bot</p>
+
+      <!-- ✅ Βήμα 1: Login (Όνομα/Επώνυμο) -->
+      <div id="qb-login" style="margin-bottom:12px;">
+        <div style="font-weight:700; margin-bottom:6px;">Στοιχεία χρήστη</div>
+        <div class="qb-row">
+          <input id="qb-first" class="qb-choice" placeholder="Όνομα" />
+          <input id="qb-last" class="qb-choice" placeholder="Επώνυμο" />
+          <button class="qb-btn secondary" id="qb-start">Έναρξη</button>
+        </div>
+        <div id="qb-login-status" style="font-size:12px; color:#555; margin-top:6px;"></div>
+      </div>
+
       <p class="qb-q" id="qb-question">Φόρτωση…</p>
 
       <div id="qb-area"></div>
@@ -47,7 +60,7 @@
 
       <div id="qb-feedback"></div>
 
-      <div style="margin-top:12px; border-top:1px solid #eee; padding-top:12px;">
+      <div id="qb-feedback-box" style="margin-top:12px; border-top:1px solid #eee; padding-top:12px;">
         <div style="font-weight:700; margin-bottom:6px;">Feedback για την ερώτηση</div>
         <div class="qb-row">
           <select id="qb-fb-cat" class="qb-choice">
@@ -95,11 +108,19 @@
   const elLast = $("#qb-last");
   const elSb = $("#qb-sb");
 
+  const fbBox = $("#qb-feedback-box");
   const fbCat = $("#qb-fb-cat");
   const fbRating = $("#qb-fb-rating");
   const fbMsg = $("#qb-fb-msg");
   const fbSend = $("#qb-fb-send");
   const fbStatus = $("#qb-fb-status");
+
+  // --- login controls ---
+  const loginBox = $("#qb-login");
+  const firstIn = $("#qb-first");
+  const lastIn = $("#qb-last");
+  const startBtn = $("#qb-start");
+  const loginStatus = $("#qb-login-status");
 
   // --- session id ---
   const sessionId = (() => {
@@ -129,6 +150,20 @@
     if (!sb) return;
     const { error } = await sb.from("quiz_feedback").insert([payload]);
     if (error) console.warn("logFeedback error:", error);
+  }
+
+  // --- NEW: register session (name/surname) ---
+  async function registerSessionIfNeeded(firstName, lastName) {
+    if (!sb) return;
+    const { error } = await sb.from("quiz_sessions").insert([{
+      session_id: sessionId,
+      first_name: firstName,
+      last_name: lastName
+    }]);
+
+    if (error && !String(error.message || "").toLowerCase().includes("duplicate")) {
+      console.warn("quiz_sessions insert error:", error);
+    }
   }
 
   // --- state ---
@@ -284,6 +319,51 @@
     if (questions.length) renderQuestion(pickRandomQuestion());
   });
 
+  // --- login gate helpers ---
+  function setQuizEnabled(enabled) {
+    elQuestion.style.display = enabled ? "" : "none";
+    elArea.style.display = enabled ? "" : "none";
+    btnNext.style.display = enabled ? "" : "none";
+    btnReset.style.display = enabled ? "" : "none";
+    elFeedback.style.display = enabled ? "" : "none";
+    fbBox.style.display = enabled ? "" : "none";
+  }
+
+  const USER_KEY = "sl_quiz_user_v1";
+  let user = null;
+  try { user = JSON.parse(localStorage.getItem(USER_KEY)); } catch { user = null; }
+
+  // αρχικά κλείδωσε μέχρι να γίνει login
+  setQuizEnabled(false);
+
+  // αν υπάρχει ήδη user, auto-start
+  if (user?.first_name && user?.last_name) {
+    loginBox.style.display = "none";
+    setQuizEnabled(true);
+    registerSessionIfNeeded(user.first_name, user.last_name);
+  }
+
+  startBtn.addEventListener("click", async () => {
+    const firstName = (firstIn.value || "").trim();
+    const lastName = (lastIn.value || "").trim();
+
+    if (!firstName || !lastName) {
+      loginStatus.textContent = "Συμπλήρωσε Όνομα και Επώνυμο.";
+      return;
+    }
+
+    user = { first_name: firstName, last_name: lastName };
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+
+    loginStatus.textContent = "Αποθήκευση…";
+    await registerSessionIfNeeded(firstName, lastName);
+
+    loginBox.style.display = "none";
+    setQuizEnabled(true);
+
+    if (questions.length) renderQuestion(pickRandomQuestion());
+  });
+
   // init
   (async () => {
     try {
@@ -293,7 +373,13 @@
       if (!Array.isArray(data) || !data.length) throw new Error("Empty questions");
       questions = data;
       setScore();
-      renderQuestion(pickRandomQuestion());
+
+      // Μόνο αν έχει γίνει login, δείχνουμε ερώτηση (αλλιώς περιμένουμε)
+      if (loginBox.style.display === "none") {
+        renderQuestion(pickRandomQuestion());
+      } else {
+        elQuestion.textContent = "Συμπλήρωσε στοιχεία για να ξεκινήσεις.";
+      }
     } catch (e) {
       console.error(e);
       elQuestion.textContent = "Αποτυχία φόρτωσης ερωτήσεων.";
